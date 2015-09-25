@@ -208,7 +208,7 @@ object Project2 {
   }
   
   // the implementation of the second part function Pushsum function(start from 09/25/2015)
-  class pushsumNode(neighbor:neighbourList.to[ListBuffer], id:Int, Stap:Array[pushsumNode], boss: Actor ) extends Actor {
+  class pushsumNode(neighbor:neighbourList.to[ListBuffer], Node().id:Int, Stap:Array[pushsumNode], Master: Actor ) extends Actor {
   def act{
     var neighbor=neighbourList.to[ListBuffer]
     var neighbor2=neighbor
@@ -219,12 +219,14 @@ object Project2 {
     loop{
       react{
         case "start" =>
+        // send a message to another actor
          var t = neighbor2(Random.nextInt(neighbor2.length))
           s=s/2 
           w=w/2
           Stap(t) ! (s, w)    
          // println("from"+id+"to"+t+"with s="+s+";  w="+w)
         case "close"=> exit()
+        //, half of s and w is kept by the sending actor and half is placed in the message. 
         case (sm:Double, wm:Double) =>
           s = (sm+s)/2
           w = (wm+w)/2
@@ -238,7 +240,7 @@ object Project2 {
           if (converge_count==3){
            
             //for (i <- 0 until neighbor2.length) Stap(neighbor2(i)) ! im_over(id)
-            boss ! (im_over(id),r0)
+            Master ! (im_over(id),r0)
             println("Actor No."+id.toString+" is over by count")
             exit()
           }
