@@ -5,6 +5,7 @@ import com.sun.org.apache.xml.internal.security.algorithms.JCEMapper.Algorithm
 import scala.collection.mutable.ListBuffer
 import scala.util.Random
 import scala.concurrent.duration.Duration
+import scala.collection.mutable._
 
 /**
  * Created by sarathfrancis90 on 9/17/15.
@@ -17,7 +18,9 @@ object Project2 {
   case object  Gossip extends Rumor
   case object  ReceivedGossip extends Rumor
   case class  EnoughGossips() extends  Rumor
-
+  // add the function of pushsum(start from 09/25/2015)
+  case class Pushsum
+  
   //variable to store no of nodes
  // var NoOfNodes:Int = _
   //list buffer to store nodes
@@ -203,4 +206,58 @@ object Project2 {
     }
 
   }
+  
+  // the implementation of the second part function Pushsum function(start from 09/25/2015)
+  class pushsumNode(neighbor:neighbourList.to[ListBuffer], id:Int, Stap:Array[pushsumNode], boss: Actor ) extends Actor {
+  def act{
+    var neighbor=neighbourList.to[ListBuffer]
+    var neighbor2=neighbor
+    var s:Double = id.toDouble
+    var w:Double = 1.0
+    var r0:Double = id.toDouble
+    var converge_count:Int = 0
+    loop{
+      react{
+        case "start" =>
+         var t = neighbor2(Random.nextInt(neighbor2.length))
+          s=s/2 
+          w=w/2
+          Stap(t) ! (s, w)    
+         // println("from"+id+"to"+t+"with s="+s+";  w="+w)
+        case "close"=> exit()
+        case (sm:Double, wm:Double) =>
+          s = (sm+s)/2
+          w = (wm+w)/2
+          var tt = neighbor2(Random.nextInt(neighbor2.length))         
+         // println("from  "+id+" to "+tt+" with s= "+s+"  ;w= "+w)
+          if (math.abs(s/w-r0)<1e-10) converge_count+=1
+          else converge_count=0
+         // println("r;diff="+(s/w)+" ; "+(s/w-r0)+" count=  "+converge_count)
+          Stap(tt) ! (s, w)
+          r0 = s/w
+          if (converge_count==3){
+           
+            //for (i <- 0 until neighbor2.length) Stap(neighbor2(i)) ! im_over(id)
+            boss ! (im_over(id),r0)
+            println("Actor No."+id.toString+" is over by count")
+            exit()
+          }
+          }       
+       }
+    }
+  }
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
 }
