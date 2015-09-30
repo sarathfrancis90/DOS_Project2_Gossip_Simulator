@@ -16,9 +16,11 @@ object Project2 {
   case class  Gossip_NodeInit (neighbourlist:List[Int]) extends Rumor
   case class  PushSum_NodeInit  (neighbourList:List[Int]) extends Rumor
   case object  Gossip extends Rumor
-  case object  PushSum extends  Rumor
+  case object  Start_PushSum extends  Rumor
+  case class  Push_Sum(s:Double,w:Double)
   case object  ReceivedGossip extends Rumor
   case class  EnoughGossips() extends  Rumor
+  case object Sum_Estimate_Converged extends  Rumor
 
   //variable to store no of nodes
  // var NoOfNodes:Int = _
@@ -49,17 +51,26 @@ object Project2 {
 
     MyActorSystem.awaitTermination()
 
+
+
   }
 
+  def Node_Number(i: Int, j: Int, k:Int,Cube_Side: Int):Int = {
+    val Nodenumber : Int = ((k * math.pow(Cube_Side,2)) +(i * Cube_Side) + j).toInt
+    Nodenumber
+  }
   class Node extends Actor with ActorLogging {
 
-    var myNeighbours : ListBuffer[Int] = _
+    var myNeighbours : ListBuffer[Int] = new ListBuffer[Int]
    // var No_of_Nodes: Int =_
     var Gossip_Count: Int = 0
     var MasterRef :ActorRef = _
     var neighbourRef:ActorRef = _
-    var s: Double = _
-    var w: Double = _
+    var si: Double = _
+    var wi: Double = _
+    var Current_Sum_Estimate:Double = _
+    var Sum_Estimate_Buffer: ListBuffer[Double] = new ListBuffer[Double]
+    var Active_Node: Int  = 0
 
 
     def receive = {
@@ -80,9 +91,69 @@ object Project2 {
         println("Node no. " + self.path.name + " initiated")
         myNeighbours = neighbourList.to[ListBuffer]
         MasterRef =sender()
-        s = self.path.name.toDouble
-        w = 1
-        println("S and W of Node no. " + self.path.name + " is " + s +" and "+ w)
+        si = self.path.name.toDouble
+        wi = 1
+        printf("my neighbors are ")
+        myNeighbours.foreach(printf("%d  ",_))
+        println(" ")
+        println("S and W of Node no. " + self.path.name + " is " + si +" and "+ wi)
+
+
+      case Start_PushSum =>
+
+        println("Start Push_Sum received from the master at the Node " + self.path.name)
+        si = si/2
+        wi = wi/2
+        Current_Sum_Estimate = si/wi
+        Sum_Estimate_Buffer += Current_Sum_Estimate
+        println("Current values: Si = " + si + " Wi = " + wi + "  Current Sum Estimate = " + Current_Sum_Estimate)
+        printf("Sum Estimate buffer:  ")
+        Sum_Estimate_Buffer.foreach(printf("%f ",_))
+        println()
+       // Thread.sleep(2000)
+        val aRandomNumber = Random.nextInt(myNeighbours.size)
+        val randomNeighbour: Int = myNeighbours(aRandomNumber)
+        Nodes(randomNeighbour) !  Push_Sum(si,wi)
+
+      case Push_Sum(s,w)  =>
+        println("Push_ Sum received at Node " + self.path.name + " from Node " + sender().path.name)
+
+        si += s
+        wi += w
+
+        Current_Sum_Estimate = si/wi
+        si = si/2
+        wi = wi/2
+
+        if(Sum_Estimate_Buffer.size < 3) {
+            Sum_Estimate_Buffer += Current_Sum_Estimate
+          }
+        else if(Active_Node == 0) {
+
+          Sum_Estimate_Buffer.remove(0)
+
+          Sum_Estimate_Buffer += Current_Sum_Estimate
+
+          if(((Sum_Estimate_Buffer(0) - Sum_Estimate_Buffer(1)) < scala.math.pow(10,-10)) && ((Sum_Estimate_Buffer(1) - Sum_Estimate_Buffer(2)) < scala.math.pow(10,-10)))  {
+            Active_Node = 1
+            for(myNeighbour <-myNeighbours) {
+              Nodes(myNeighbour) ! Sum_Estimate_Converged
+            }
+            MasterRef ! EnoughGossips
+            println("I am done - Node "+ self.path.name)
+          }
+        }
+            println("Current values: Si = " + si + " Wi = " + wi + "  Current Sum Estimate = " + Current_Sum_Estimate)
+            printf("Sum Estimate buffer:  ")
+            Sum_Estimate_Buffer.foreach(printf("%f ",_))
+            println()
+            //Thread.sleep(2000)
+            if(myNeighbours.size > 0) {
+              val aRandomNumber = Random.nextInt(myNeighbours.size)
+              val randomNeighbour: Int = myNeighbours(aRandomNumber)
+              Nodes(randomNeighbour) ! Push_Sum(si, wi)
+            }
+
 
       case Gossip  =>
 //        printf("my neighbors are ")
@@ -141,6 +212,20 @@ object Project2 {
          }
         //Thread.sleep(1000)
          self ! ReceivedGossip
+
+      case Sum_Estimate_Converged =>
+
+        if(myNeighbours.contains(sender().path.name.toInt)) {
+          println("Node " + self.path.name + " Received EnoughGossips from " + sender().path.name)
+          myNeighbours -= sender().path.name.toInt
+
+          if(myNeighbours.size > 0) {
+            val aRandomNumber = Random.nextInt(myNeighbours.size)
+            val randomNeighbour: Int = myNeighbours(aRandomNumber)
+            Nodes(randomNeighbour) ! Push_Sum(si, wi)
+          }
+
+        }
     }
   }
 
@@ -163,13 +248,15 @@ object Project2 {
         networktopology = topology
         currentalgorithm = algorithm
 
-        for (i <- 0 until no_Of_Nodes) {
-          Nodes += MyActorSystem.actorOf(Props(new Node), name = i.toString)
 
-        }
         //println(no_Of_Nodes +" " +networktopology +" "+ currentalgorithm)
 
         if (networktopology == "full") {
+
+          for (i <- 0 until no_Of_Nodes) {
+            Nodes += MyActorSystem.actorOf(Props(new Node), name = i.toString)
+
+          }
 
           for (i <- 0 until no_Of_Nodes) {
             neighbours.clear()
@@ -189,7 +276,9 @@ object Project2 {
             }
             else if( currentalgorithm == "pushsum") {
 
+
               Nodes(i)  ! PushSum_NodeInit(neighbours.toList)
+             // Thread.sleep(2000)
 
             }
 
@@ -201,6 +290,11 @@ object Project2 {
         }
         else if (networktopology =="line") {
 
+          for (i <- 0 until no_Of_Nodes) {
+            Nodes += MyActorSystem.actorOf(Props(new Node), name = i.toString)
+
+          }
+
           for(i <- 0 until no_Of_Nodes) {
             neighbours.clear()
             if(i==0) neighbours += i+1
@@ -210,50 +304,106 @@ object Project2 {
               neighbours += i+1
             }
 
-            Nodes(i) ! Gossip_NodeInit(neighbours.toList)
+            if(currentalgorithm == "gossip")  {
+              Nodes(i) ! Gossip_NodeInit(neighbours.toList)
+            }
+            else if( currentalgorithm == "pushsum") {
+              Nodes(i)  ! PushSum_NodeInit(neighbours.toList)
+            }
             //Thread.sleep(2000)
           }
-          if(currentalgorithm == "gossip")  {
 
-          }
-          else if( currentalgorithm == "pushsum") {
-
-          }
 
         }
         else if(networktopology == "3D")  {
-//          if((Math.cbrt(no_Of_Nodes).toInt) == Math.cbrt(no_Of_Nodes))
-          val cube_side: Double = Math.cbrt(no_Of_Nodes)
-          //Nodes(i) ! Gossip_NodeInit(neighbourList, noOfNodes)
-          for( i <- 0 until no_Of_Nodes)  {
-            for (j <- 0 until no_Of_Nodes)  {
-              for (k <- 0 until no_Of_Nodes)  {
+          val cube_Side_rounded : Int = math.ceil(Math.cbrt(no_Of_Nodes)).toInt
+          val NewNoofNodes: Int = Math.pow(cube_Side_rounded,3).toInt
+//          println("Initial No of Nodes: " + no_Of_Nodes)
+//          //println("Cube root: " + cube_side)
+//          println("After Rounding : " + cube_Side_rounded)
+//          println("New No of nodes : "  + NewNoofNodes)
+          for (i <- 0 until NewNoofNodes) {
+            Nodes += MyActorSystem.actorOf(Props(new Node), name = i.toString)
+
+          }
+          for( k <- 0 until cube_Side_rounded)  {
+            for (i <- 0 until cube_Side_rounded)  {
+              for (j <- 0 until cube_Side_rounded)  {
+
+                val current_Node :  Int = Node_Number(i,j,k,cube_Side_rounded)
+                neighbours.clear()
+                if(!(i-1 < 0))
+                  neighbours += Node_Number(i-1,j,k,cube_Side_rounded)
+                if(!((i+1) > (cube_Side_rounded - 1)))
+                  neighbours += Node_Number(i+1,j,k,cube_Side_rounded)
+                if(!(j-1 < 0))
+                  neighbours += Node_Number(i,j-1,k,cube_Side_rounded)
+                if(!((j+1) > (cube_Side_rounded - 1)))
+                  neighbours += Node_Number(i,j+1,k,cube_Side_rounded)
+                if(!(k-1 < 0))
+                  neighbours += Node_Number(i,j,k-1,cube_Side_rounded)
+                if(!((k+1) > (cube_Side_rounded - 1)))
+                  neighbours += Node_Number(i,j,k+1,cube_Side_rounded)
+
+//                println("Neighbours Of Node : " + current_Node + " are")
+//                neighbours.foreach(printf("%d ",_))
+//                println()
 
 
+                if(currentalgorithm == "gossip")  {
+                  Nodes(current_Node) ! Gossip_NodeInit(neighbours.toList)
+                }
+                else if( currentalgorithm == "pushsum") {
+                  Nodes(current_Node)  ! PushSum_NodeInit(neighbours.toList)
+                }
               }
             }
           }
-
-
-          if(currentalgorithm == "gossip")  {
-
-          }
-          else if( currentalgorithm == "pushsum") {
-
-          }
-
         }
          else if(networktopology == "imp3D") {
 
-          //Nodes(i) ! Gossip_NodeInit(neighbourList, noOfNodes)
-
-
-
-          if(currentalgorithm == "gossip")  {
+          val cube_Side_rounded : Int = math.ceil(Math.cbrt(no_Of_Nodes)).toInt
+          val NewNoofNodes: Int = Math.pow(cube_Side_rounded,3).toInt
+          //          println("Initial No of Nodes: " + no_Of_Nodes)
+          //          //println("Cube root: " + cube_side)
+          //          println("After Rounding : " + cube_Side_rounded)
+          //          println("New No of nodes : "  + NewNoofNodes)
+          for (i <- 0 until NewNoofNodes) {
+            Nodes += MyActorSystem.actorOf(Props(new Node), name = i.toString)
 
           }
-          else if( currentalgorithm == "pushsum") {
+          for( k <- 0 until cube_Side_rounded)  {
+            for (i <- 0 until cube_Side_rounded)  {
+              for (j <- 0 until cube_Side_rounded)  {
 
+                val current_Node :  Int = Node_Number(i,j,k,cube_Side_rounded)
+                neighbours.clear()
+                if(!(i-1 < 0))
+                  neighbours += Node_Number(i-1,j,k,cube_Side_rounded)
+                if(!((i+1) > (cube_Side_rounded - 1)))
+                  neighbours += Node_Number(i+1,j,k,cube_Side_rounded)
+                if(!(j-1 < 0))
+                  neighbours += Node_Number(i,j-1,k,cube_Side_rounded)
+                if(!((j+1) > (cube_Side_rounded - 1)))
+                  neighbours += Node_Number(i,j+1,k,cube_Side_rounded)
+                if(!(k-1 < 0))
+                  neighbours += Node_Number(i,j,k-1,cube_Side_rounded)
+                if(!((k+1) > (cube_Side_rounded - 1)))
+                  neighbours += Node_Number(i,j,k+1,cube_Side_rounded)
+
+                //                println("Neighbours Of Node : " + current_Node + " are")
+                //                neighbours.foreach(printf("%d ",_))
+                //                println()
+
+
+                if(currentalgorithm == "gossip")  {
+                  Nodes(current_Node) ! Gossip_NodeInit(neighbours.toList)
+                }
+                else if( currentalgorithm == "pushsum") {
+                  Nodes(current_Node)  ! PushSum_NodeInit(neighbours.toList)
+                }
+              }
+            }
           }
 
         }
@@ -261,12 +411,12 @@ object Project2 {
 
         if(currentalgorithm == "gossip")  {
 
-          // Nodes(Random.nextInt(Nodes.size)) ! Gossip
+          Nodes(Random.nextInt(Nodes.size)) ! Gossip
 
         }
         else if( currentalgorithm == "pushsum") {
 
-          Nodes(Random.nextInt(Nodes.size)) ! PushSum
+          Nodes(Random.nextInt(Nodes.size)) ! Start_PushSum
 
         }
 
