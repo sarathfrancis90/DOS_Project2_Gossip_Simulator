@@ -238,7 +238,7 @@ object Project2 {
     var no_Of_Nodes:Int = _
     var networktopology: String = _
     var currentalgorithm: String =_
-
+    var Nodes_List: ListBuffer[Int] = new ListBuffer[Int]
     def receive = {
 
       //Initiating Master by the Main Process
@@ -370,34 +370,63 @@ object Project2 {
           //          println("New No of nodes : "  + NewNoofNodes)
           for (i <- 0 until NewNoofNodes) {
             Nodes += MyActorSystem.actorOf(Props(new Node), name = i.toString)
-
           }
+
           for( k <- 0 until cube_Side_rounded)  {
             for (i <- 0 until cube_Side_rounded)  {
               for (j <- 0 until cube_Side_rounded)  {
-
+                Nodes_List.clear()
+                for (i <- 0 until NewNoofNodes) {
+                  Nodes_List += i
+                }
+//                println("Nodes_List before removing neighbours :")
+//                Nodes_List.foreach(printf("%d ",_))
+//                println()
                 val current_Node :  Int = Node_Number(i,j,k,cube_Side_rounded)
                 neighbours.clear()
-                if(!(i-1 < 0))
+                if(!(i-1 < 0))  {
                   neighbours += Node_Number(i-1,j,k,cube_Side_rounded)
-                if(!((i+1) > (cube_Side_rounded - 1)))
+                  Nodes_List -= Node_Number(i-1,j,k,cube_Side_rounded)
+
+                }
+                Nodes_List -= Node_Number(i,j,k,cube_Side_rounded)
+
+                if(!((i+1) > (cube_Side_rounded - 1)))  {
                   neighbours += Node_Number(i+1,j,k,cube_Side_rounded)
-                if(!(j-1 < 0))
-                  neighbours += Node_Number(i,j-1,k,cube_Side_rounded)
-                if(!((j+1) > (cube_Side_rounded - 1)))
-                  neighbours += Node_Number(i,j+1,k,cube_Side_rounded)
-                if(!(k-1 < 0))
+                  Nodes_List -= Node_Number(i+1,j,k,cube_Side_rounded)
+                }
+                if(!(j-1 < 0)) {
+                  neighbours += Node_Number(i, j - 1, k, cube_Side_rounded)
+                  Nodes_List -= Node_Number(i, j - 1, k, cube_Side_rounded)
+
+                }
+                if(!((j+1) > (cube_Side_rounded - 1))) {
+                  neighbours += Node_Number(i, j + 1, k, cube_Side_rounded)
+                  Nodes_List -= Node_Number(i, j + 1, k, cube_Side_rounded)
+                }
+                if(!(k-1 < 0))  {
                   neighbours += Node_Number(i,j,k-1,cube_Side_rounded)
-                if(!((k+1) > (cube_Side_rounded - 1)))
-                  neighbours += Node_Number(i,j,k+1,cube_Side_rounded)
+                  Nodes_List -= Node_Number(i,j,k-1,cube_Side_rounded)
+                }
+                if(!((k+1) > (cube_Side_rounded - 1))) {
+                  neighbours += Node_Number(i, j, k + 1, cube_Side_rounded)
+                  Nodes_List -= Node_Number(i, j, k + 1, cube_Side_rounded)
+                }
 
-                //                println("Neighbours Of Node : " + current_Node + " are")
-                //                neighbours.foreach(printf("%d ",_))
-                //                println()
+                neighbours += Random.nextInt(Nodes_List.size)
 
-
+//                println("Neighbours Of Node : " + current_Node + " are")
+//                neighbours.foreach(printf("%d ",_))
+//                println()
+//
+//                println("Nodes_List after removing neighbours :")
+//                Nodes_List.foreach(printf("%d ",_))
+//                println()
+//
+//                println()
                 if(currentalgorithm == "gossip")  {
                   Nodes(current_Node) ! Gossip_NodeInit(neighbours.toList)
+//                  Thread.sleep(2000)
                 }
                 else if( currentalgorithm == "pushsum") {
                   Nodes(current_Node)  ! PushSum_NodeInit(neighbours.toList)
@@ -429,10 +458,8 @@ object Project2 {
           println("Node "+sender().path.name+" has completed")
         noOfcompletedNodes += 1
         if(noOfcompletedNodes == Nodes.length)  {
-
         timeAfterGossip = System.currentTimeMillis()
           println("Time taken to converge :" + (timeAfterGossip-timeBeforeStartGossip) )
-
           context.system.shutdown()
         }
 
