@@ -15,22 +15,16 @@ object Project2 {
   case class  MasterInit(noOfNodes:Int,topology:String,algorithm:String) extends Rumor
   case class  Gossip_NodeInit (neighbourlist:List[Int]) extends Rumor
   case class  PushSum_NodeInit  (neighbourList:List[Int]) extends Rumor
-  case object  Gossip extends Rumor
-  case object  Start_PushSum extends  Rumor
+  case object Gossip extends Rumor
+  case object Start_PushSum extends  Rumor
   case class  Push_Sum(s:Double,w:Double)
-  case object  ReceivedGossip extends Rumor
+  case object ReceivedGossip extends Rumor
   case class  EnoughGossips() extends  Rumor
   case object Sum_Estimate_Converged extends  Rumor
 
-  //variable to store no of nodes
- // var NoOfNodes:Int = _
-  //list buffer to store nodes
   var Nodes :ListBuffer[ActorRef] = new ListBuffer[ActorRef]()
-  //variable to store Actor System
-  var MyActorSystem : ActorSystem = _
-  //NeighbourList
-  //val NeighbourList = new ListBuffer[ActorRef]()
 
+  var MyActorSystem : ActorSystem = _
 
   def main (args: Array[String])
   {
@@ -50,19 +44,16 @@ object Project2 {
     master ! MasterInit(NoOfNodes,Topology,Algorithm)
 
     MyActorSystem.awaitTermination()
-
-
-
   }
 
   def Node_Number(i: Int, j: Int, k:Int,Cube_Side: Int):Int = {
     val Nodenumber : Int = ((k * math.pow(Cube_Side,2)) +(i * Cube_Side) + j).toInt
     Nodenumber
   }
+
   class Node extends Actor with ActorLogging {
 
     var myNeighbours : ListBuffer[Int] = new ListBuffer[Int]
-   // var No_of_Nodes: Int =_
     var Gossip_Count: Int = 0
     var MasterRef :ActorRef = _
     var neighbourRef:ActorRef = _
@@ -76,47 +67,42 @@ object Project2 {
     def receive = {
 
       case Gossip_NodeInit(neighbourList) =>
-       //log.info("Node Initiated")
-        println("Node no. " + self.path.name + " initiated")
+
+//        println("Node no. " + self.path.name + " initiated")
         MasterRef = sender()
         myNeighbours = neighbourList.to[ListBuffer]
-       // No_of_Nodes = noOfNodes
-
-//        printf("my neighbors are ")
-//        myNeighbours.foreach(printf("%d  ",_))
-//        println(" ")
 
       case PushSum_NodeInit(neighbourList)  =>
 
-        println("Node no. " + self.path.name + " initiated")
+//        println("Node no. " + self.path.name + " initiated")
         myNeighbours = neighbourList.to[ListBuffer]
         MasterRef =sender()
         si = self.path.name.toDouble
         wi = 1
-        printf("my neighbors are ")
-        myNeighbours.foreach(printf("%d  ",_))
-        println(" ")
-        println("S and W of Node no. " + self.path.name + " is " + si +" and "+ wi)
+//        printf("my neighbors are ")
+//        myNeighbours.foreach(printf("%d  ",_))
+//        println(" ")
+//        println("S and W of Node no. " + self.path.name + " is " + si +" and "+ wi)
 
 
       case Start_PushSum =>
 
-        println("Start Push_Sum received from the master at the Node " + self.path.name)
+//        println("Start Push_Sum received from the master at the Node " + self.path.name)
         si = si/2
         wi = wi/2
         Current_Sum_Estimate = si/wi
         Sum_Estimate_Buffer += Current_Sum_Estimate
-        println("Current values: Si = " + si + " Wi = " + wi + "  Current Sum Estimate = " + Current_Sum_Estimate)
-        printf("Sum Estimate buffer:  ")
-        Sum_Estimate_Buffer.foreach(printf("%f ",_))
-        println()
-       // Thread.sleep(2000)
+//        println("Current values: Si = " + si + " Wi = " + wi + "  Current Sum Estimate = " + Current_Sum_Estimate)
+//        printf("Sum Estimate buffer:  ")
+//        Sum_Estimate_Buffer.foreach(printf("%f ",_))
+//        println()
         val aRandomNumber = Random.nextInt(myNeighbours.size)
         val randomNeighbour: Int = myNeighbours(aRandomNumber)
         Nodes(randomNeighbour) !  Push_Sum(si,wi)
 
       case Push_Sum(s,w)  =>
-        println("Push_ Sum received at Node " + self.path.name + " from Node " + sender().path.name)
+
+//        println("Push_ Sum received at Node " + self.path.name + " from Node " + sender().path.name)
 
         si += s
         wi += w
@@ -125,43 +111,42 @@ object Project2 {
         si = si/2
         wi = wi/2
 
-        if(Sum_Estimate_Buffer.size < 3) {
+        if(Active_Node == 0) {
+
+
+
+          if(Sum_Estimate_Buffer.size < 3) {
             Sum_Estimate_Buffer += Current_Sum_Estimate
           }
-        else if(Active_Node == 0) {
+          else  {
 
-          Sum_Estimate_Buffer.remove(0)
+            Sum_Estimate_Buffer.remove(0)
 
-          Sum_Estimate_Buffer += Current_Sum_Estimate
+            Sum_Estimate_Buffer += Current_Sum_Estimate
 
-          if(((Sum_Estimate_Buffer(0) - Sum_Estimate_Buffer(1)) < scala.math.pow(10,-10)) && ((Sum_Estimate_Buffer(1) - Sum_Estimate_Buffer(2)) < scala.math.pow(10,-10)))  {
-            Active_Node = 1
-            for(myNeighbour <-myNeighbours) {
-              Nodes(myNeighbour) ! Sum_Estimate_Converged
+            if(((Sum_Estimate_Buffer(0) - Sum_Estimate_Buffer(1)) < scala.math.pow(10,-10)) && ((Sum_Estimate_Buffer(1) - Sum_Estimate_Buffer(2)) < scala.math.pow(10,-10)))  {
+              Active_Node = 1
+              MasterRef ! EnoughGossips
+//              println("I am done - Node "+ self.path.name)
             }
-            MasterRef ! EnoughGossips
-            println("I am done - Node "+ self.path.name)
           }
+
         }
-            println("Current values: Si = " + si + " Wi = " + wi + "  Current Sum Estimate = " + Current_Sum_Estimate)
-            printf("Sum Estimate buffer:  ")
-            Sum_Estimate_Buffer.foreach(printf("%f ",_))
-            println()
-            //Thread.sleep(2000)
-            if(myNeighbours.size > 0) {
-              val aRandomNumber = Random.nextInt(myNeighbours.size)
-              val randomNeighbour: Int = myNeighbours(aRandomNumber)
-              Nodes(randomNeighbour) ! Push_Sum(si, wi)
-            }
+//        println("Current values at Node : " +self.path.name + " is  : Si = " + si + " Wi = " + wi + "  Current Sum Estimate = " + Current_Sum_Estimate)
+//        printf("Sum Estimate buffer:  ")
+//        Sum_Estimate_Buffer.foreach(printf("%f ",_))
+//        println()
+        if(myNeighbours.size > 0) {
+          val aRandomNumber = Random.nextInt(myNeighbours.size)
+          val randomNeighbour: Int = myNeighbours(aRandomNumber)
+          Nodes(randomNeighbour) ! Push_Sum(si, wi)
+        }
 
 
       case Gossip  =>
-//        printf("my neighbors are ")
-//        myNeighbours.foreach(printf("%d  ",_))
-//        println(" ")
         Gossip_Count+=1
-        if(Gossip_Count <=10)
-        println("Gossip number "+ Gossip_Count + " received at " + self.path.name + " from "+ sender().path.name)
+//        if(Gossip_Count <=10)
+//        println("Gossip number "+ Gossip_Count + " received at " + self.path.name + " from "+ sender().path.name)
 
         if(Gossip_Count == 10) {
 //          println("Gossip number "+ Gossip_Count + " received at " + self.path.name + " from "+ sender().path.name)
@@ -169,54 +154,30 @@ object Project2 {
             Nodes(myNeighbour) ! EnoughGossips
           }
           MasterRef ! EnoughGossips
-          println("I am done - Node "+ self.path.name)
+//          println("I am done - Node "+ self.path.name)
         }
-//         Thread.sleep(1000)
-          self ! ReceivedGossip
+        self ! ReceivedGossip
 
       case ReceivedGossip =>
-//        println("ReceivedGossip received at " + self.path.name)
-//        printf("my neighbors are ")
-//        myNeighbours.foreach(printf("%d  ",_))
-//        println()
-//        Thread.sleep(1000)
 
         if(myNeighbours.length > 0) {
           val aRandomNumber = Random.nextInt(myNeighbours.size)
           val randomNeighbour: Int = myNeighbours(aRandomNumber)
           Nodes(randomNeighbour) !  Gossip
         }
-//          if(self.path.name == Nodes(randomNeighbour).path.name) {
-//            printf ("i am %s\n", self.path.name)
-//            printf("my neighbors are ")
-//            myNeighbours.foreach(printf("%d  ",_))
-//            println("\nsending to self")
-//            printf("i generated random number %d\n", aRandomNumber)
-//            printf("i am going to send to %d\n", randomNeighbour)
-//            printf("that neighbors name is %s\n", Nodes(randomNeighbour).path.name)
-//            Thread.sleep(3000)
-//          }
         self !ReceivedGossip
 
       case EnoughGossips  =>
          if(myNeighbours.contains(sender().path.name.toInt))  {
-           println("Node "+ self.path.name +" Received EnoughGossips from " + sender().path.name)
+//           println("Node "+ self.path.name +" Received EnoughGossips from " + sender().path.name)
          myNeighbours -= sender().path.name.toInt
-          // if(myNeighbours.length != 0) {
-//               printf("my neighbors are ")
-//               myNeighbours.foreach(printf("%d  ",_))
-//               println()
-//               Thread.sleep(3000)
-          // }
-
-         }
-        //Thread.sleep(1000)
+          }
          self ! ReceivedGossip
 
       case Sum_Estimate_Converged =>
 
         if(myNeighbours.contains(sender().path.name.toInt)) {
-          println("Node " + self.path.name + " Received EnoughGossips from " + sender().path.name)
+//          println("Node " + self.path.name + " Received EnoughGossips from " + sender().path.name)
           myNeighbours -= sender().path.name.toInt
 
           if(myNeighbours.size > 0) {
@@ -243,10 +204,10 @@ object Project2 {
 
       //Initiating Master by the Main Process
       case MasterInit(noOfNodes, topology, algorithm) =>
-
+        println("Master Initiated")
         no_Of_Nodes = noOfNodes
-        networktopology = topology
-        currentalgorithm = algorithm
+        networktopology = topology.toLowerCase()
+        currentalgorithm = algorithm.toLowerCase()
 
 
         //println(no_Of_Nodes +" " +networktopology +" "+ currentalgorithm)
@@ -274,19 +235,12 @@ object Project2 {
               Nodes(i) ! Gossip_NodeInit(neighbours.toList)
 
             }
-            else if( currentalgorithm == "pushsum") {
-
+            else if( currentalgorithm == "push-sum") {
 
               Nodes(i)  ! PushSum_NodeInit(neighbours.toList)
-             // Thread.sleep(2000)
 
             }
-
-
-            //Thread.sleep(2000)
           }
-
-          //println(Nodes.size)
         }
         else if (networktopology =="line") {
 
@@ -307,21 +261,16 @@ object Project2 {
             if(currentalgorithm == "gossip")  {
               Nodes(i) ! Gossip_NodeInit(neighbours.toList)
             }
-            else if( currentalgorithm == "pushsum") {
+            else if( currentalgorithm == "push-sum") {
               Nodes(i)  ! PushSum_NodeInit(neighbours.toList)
             }
-            //Thread.sleep(2000)
           }
 
 
         }
-        else if(networktopology == "3D")  {
+        else if(networktopology == "3d")  {
           val cube_Side_rounded : Int = math.ceil(Math.cbrt(no_Of_Nodes)).toInt
           val NewNoofNodes: Int = Math.pow(cube_Side_rounded,3).toInt
-//          println("Initial No of Nodes: " + no_Of_Nodes)
-//          //println("Cube root: " + cube_side)
-//          println("After Rounding : " + cube_Side_rounded)
-//          println("New No of nodes : "  + NewNoofNodes)
           for (i <- 0 until NewNoofNodes) {
             Nodes += MyActorSystem.actorOf(Props(new Node), name = i.toString)
 
@@ -345,29 +294,20 @@ object Project2 {
                 if(!((k+1) > (cube_Side_rounded - 1)))
                   neighbours += Node_Number(i,j,k+1,cube_Side_rounded)
 
-//                println("Neighbours Of Node : " + current_Node + " are")
-//                neighbours.foreach(printf("%d ",_))
-//                println()
-
-
                 if(currentalgorithm == "gossip")  {
                   Nodes(current_Node) ! Gossip_NodeInit(neighbours.toList)
                 }
-                else if( currentalgorithm == "pushsum") {
+                else if( currentalgorithm == "push-sum") {
                   Nodes(current_Node)  ! PushSum_NodeInit(neighbours.toList)
                 }
               }
             }
           }
         }
-         else if(networktopology == "imp3D") {
+         else if(networktopology == "imp3d") {
 
           val cube_Side_rounded : Int = math.ceil(Math.cbrt(no_Of_Nodes)).toInt
           val NewNoofNodes: Int = Math.pow(cube_Side_rounded,3).toInt
-          //          println("Initial No of Nodes: " + no_Of_Nodes)
-          //          //println("Cube root: " + cube_side)
-          //          println("After Rounding : " + cube_Side_rounded)
-          //          println("New No of nodes : "  + NewNoofNodes)
           for (i <- 0 until NewNoofNodes) {
             Nodes += MyActorSystem.actorOf(Props(new Node), name = i.toString)
           }
@@ -379,9 +319,7 @@ object Project2 {
                 for (i <- 0 until NewNoofNodes) {
                   Nodes_List += i
                 }
-//                println("Nodes_List before removing neighbours :")
-//                Nodes_List.foreach(printf("%d ",_))
-//                println()
+
                 val current_Node :  Int = Node_Number(i,j,k,cube_Side_rounded)
                 neighbours.clear()
                 if(!(i-1 < 0))  {
@@ -414,21 +352,11 @@ object Project2 {
                 }
 
                 neighbours += Random.nextInt(Nodes_List.size)
-
-//                println("Neighbours Of Node : " + current_Node + " are")
-//                neighbours.foreach(printf("%d ",_))
-//                println()
-//
-//                println("Nodes_List after removing neighbours :")
-//                Nodes_List.foreach(printf("%d ",_))
-//                println()
-//
-//                println()
                 if(currentalgorithm == "gossip")  {
                   Nodes(current_Node) ! Gossip_NodeInit(neighbours.toList)
 //                  Thread.sleep(2000)
                 }
-                else if( currentalgorithm == "pushsum") {
+                else if( currentalgorithm == "push-sum") {
                   Nodes(current_Node)  ! PushSum_NodeInit(neighbours.toList)
                 }
               }
@@ -443,27 +371,21 @@ object Project2 {
           Nodes(Random.nextInt(Nodes.size)) ! Gossip
 
         }
-        else if( currentalgorithm == "pushsum") {
+        else if( currentalgorithm == "push-sum") {
 
           Nodes(Random.nextInt(Nodes.size)) ! Start_PushSum
 
         }
-
-
-
         timeBeforeStartGossip =  System.currentTimeMillis()
 
-
       case EnoughGossips  =>
-          println("Node "+sender().path.name+" has completed")
+//        println("Node "+sender().path.name+" has completed")
         noOfcompletedNodes += 1
         if(noOfcompletedNodes == Nodes.length)  {
         timeAfterGossip = System.currentTimeMillis()
-          println("Time taken to converge :" + (timeAfterGossip-timeBeforeStartGossip) )
+          println("Time taken to converge :" + (timeAfterGossip-timeBeforeStartGossip) + " milli seconds")
           context.system.shutdown()
         }
-
-
     }
 
   }
