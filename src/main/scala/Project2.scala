@@ -29,21 +29,29 @@ object Project2 {
   def main (args: Array[String])
   {
 
-    val NoOfNodes: Int = args(0).toInt
-    val Topology:String  = args(1)
-    val Algorithm:String = args(2)
+    if(args.length != 3) {
+        println("Enter the arguments in the following order <No of Nodes>, <Topology (full/line/3D/imp3D )>, <Algorithm (gossip/push-sum>")
+      sys.exit()
+      }
+    else {
+      val NoOfNodes: Int = args(0).toInt
+      val Topology:String  = args(1)
+      val Algorithm:String = args(2)
 
 
-    //Creating Actor System
-    MyActorSystem = ActorSystem ("GossipSimulator")
+      //Creating Actor System
+      MyActorSystem = ActorSystem ("GossipSimulator")
 
-    //Creating MasterneighbourList.toList
-    val master = MyActorSystem.actorOf(Props(new Master), name ="Master")
+      //Creating MasterneighbourList.toList
+      val master = MyActorSystem.actorOf(Props(new Master), name ="Master")
 
-    //Initiating Master
-    master ! MasterInit(NoOfNodes,Topology,Algorithm)
+      //Initiating Master
+      master ! MasterInit(NoOfNodes,Topology,Algorithm)
 
-    MyActorSystem.awaitTermination()
+      MyActorSystem.awaitTermination()
+
+      }
+
   }
 
   def Node_Number(i: Int, j: Int, k:Int,Cube_Side: Int):Int = {
@@ -62,6 +70,7 @@ object Project2 {
     var Current_Sum_Estimate:Double = _
     var Sum_Estimate_Buffer: ListBuffer[Double] = new ListBuffer[Double]
     var Active_Node: Int  = 0
+    val converge_check : Double = 0.0000000001
 
 
     def receive = {
@@ -124,7 +133,7 @@ object Project2 {
 
             Sum_Estimate_Buffer += Current_Sum_Estimate
 
-            if(((Sum_Estimate_Buffer(0) - Sum_Estimate_Buffer(1)) < scala.math.pow(10,-10)) && ((Sum_Estimate_Buffer(1) - Sum_Estimate_Buffer(2)) < scala.math.pow(10,-10)))  {
+            if(((Sum_Estimate_Buffer(0) - Sum_Estimate_Buffer(1)) < converge_check) && ((Sum_Estimate_Buffer(1) - Sum_Estimate_Buffer(2)) < converge_check))  {
               Active_Node = 1
               MasterRef ! EnoughGossips
 //              println("I am done - Node "+ self.path.name)
@@ -145,7 +154,7 @@ object Project2 {
 
       case Gossip  =>
         Gossip_Count+=1
-//        if(Gossip_Count <=10)
+        if(Gossip_Count <=10)
 //        println("Gossip number "+ Gossip_Count + " received at " + self.path.name + " from "+ sender().path.name)
 
         if(Gossip_Count == 10) {
@@ -209,9 +218,6 @@ object Project2 {
         networktopology = topology.toLowerCase()
         currentalgorithm = algorithm.toLowerCase()
 
-
-        //println(no_Of_Nodes +" " +networktopology +" "+ currentalgorithm)
-
         if (networktopology == "full") {
 
           for (i <- 0 until no_Of_Nodes) {
@@ -235,7 +241,7 @@ object Project2 {
               Nodes(i) ! Gossip_NodeInit(neighbours.toList)
 
             }
-            else if( currentalgorithm == "push-sum") {
+            else if( currentalgorithm == "push-sum" || currentalgorithm == "pushsum") {
 
               Nodes(i)  ! PushSum_NodeInit(neighbours.toList)
 
@@ -261,7 +267,7 @@ object Project2 {
             if(currentalgorithm == "gossip")  {
               Nodes(i) ! Gossip_NodeInit(neighbours.toList)
             }
-            else if( currentalgorithm == "push-sum") {
+            else if( currentalgorithm == "push-sum" || currentalgorithm == "pushsum") {
               Nodes(i)  ! PushSum_NodeInit(neighbours.toList)
             }
           }
@@ -297,7 +303,7 @@ object Project2 {
                 if(currentalgorithm == "gossip")  {
                   Nodes(current_Node) ! Gossip_NodeInit(neighbours.toList)
                 }
-                else if( currentalgorithm == "push-sum") {
+                else if( currentalgorithm == "push-sum" || currentalgorithm == "pushsum") {
                   Nodes(current_Node)  ! PushSum_NodeInit(neighbours.toList)
                 }
               }
@@ -356,7 +362,7 @@ object Project2 {
                   Nodes(current_Node) ! Gossip_NodeInit(neighbours.toList)
 //                  Thread.sleep(2000)
                 }
-                else if( currentalgorithm == "push-sum") {
+                else if( currentalgorithm == "push-sum" || currentalgorithm == "pushsum") {
                   Nodes(current_Node)  ! PushSum_NodeInit(neighbours.toList)
                 }
               }
@@ -371,7 +377,7 @@ object Project2 {
           Nodes(Random.nextInt(Nodes.size)) ! Gossip
 
         }
-        else if( currentalgorithm == "push-sum") {
+        else if( currentalgorithm == "push-sum" || currentalgorithm == "pushsum") {
 
           Nodes(Random.nextInt(Nodes.size)) ! Start_PushSum
 
